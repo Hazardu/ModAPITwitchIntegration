@@ -1,0 +1,10 @@
+<Mod ID="ModAPITwitchIntegration">
+  <Compatible>1.11b</Compatible>
+  <Name>
+    <EN>ModAPI Twitch Integration Core</EN>
+  </Name>
+  <Description>
+    <EN>SHORTCUT IS CTRL + SHIFT + F8!   Provides utilities independent from game, so it will work for any game supported by MODAPI, Made by Hazard</EN>
+  </Description>
+  <Version>1.1.0.6</Version>
+</Mod>
