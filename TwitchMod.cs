@@ -70,11 +70,28 @@ namespace ModAPITwitchIntegration
             {
                 if (enable)
                 {
-                    time = 4;            
-                        yield return twitchMod.Update();
-                   
+                    time = 4;
+                    if (twitchMod.UpdatePing())
+                        yield return null;
+                    else
+                    {
+                        if (twitchMod.UpdateConnection())
+                            yield return null;
+                        else
+                        {
+                            twitchMod.UpdateChat();
+                                yield return null;
+                            if(twitchMod.UpdateJoining())
+                                yield return null;
+                        }
+                    
+                    }
+
+                    
                 }
-                yield return new WaitForSeconds(1);
+                yield return null;
+                yield return null;
+                yield return null;
             }
         }
 
@@ -261,20 +278,20 @@ namespace ModAPITwitchIntegration
         {
             try
             {
-               
-                    client =  new TcpClient(Config.adress, Config.port);
-                    reader = new StreamReader(client.GetStream());
-                    writer = new StreamWriter(client.GetStream());
 
-                    writer.WriteLine("PASS " + Config.password + Environment.NewLine +
-                        "NICK " + Config.username + Environment.NewLine +
-                        "USER " + Config.username + " 8 * :" + Config.username);
+                client = new TcpClient(Config.adress, Config.port);
+                reader = new StreamReader(client.GetStream());
+                writer = new StreamWriter(client.GetStream());
 
-                    writer.WriteLine("JOIN " + Config.channel);
-                    writer.Flush();
-                    pingDelay = Time.time;
-                    pinging = false;
-                    joined = false;
+                writer.WriteLine("PASS " + Config.password + Environment.NewLine +
+                    "NICK " + Config.username + Environment.NewLine +
+                    "USER " + Config.username + " 8 * :" + Config.username);
+
+                writer.WriteLine("JOIN " + Config.channel);
+                writer.Flush();
+                pingDelay = Time.time;
+                pinging = false;
+                joined = false;
                 ModAPI.Console.Write("Connected successfully");
 
             }
@@ -287,55 +304,58 @@ namespace ModAPITwitchIntegration
 
         public float pingDelay;
         bool pinging;
-        public IEnumerator Update()
+        public bool UpdatePing()
         {
-            if (pingDelay + 20 < Time.time)
+            if (pingDelay + 25 < Time.time)
             {
-                Console.WriteLine("Pinging");
                 pingDelay = Time.time;
                 writer.WriteLine("PING");
                 writer.Flush();
                 pinging = true;
+                return true;
             }
             else if (pinging && pingDelay + 10 < Time.time)
             {
-                 Reconnect();
-                yield return null;
+                Reconnect();
+                return true;
             }
+            return false;
+        }
+        public bool UpdateConnection()
+        {
             if (!client.Connected)
             {
                 Reconnect();
-                yield return null;
-
+                return true;
             }
-            while (client.Available > 0 || reader.Peek() > 0)
+            return false;
+        }
+        public void UpdateChat()
+        {
+            if (client.Available > 0)
             {
 
                 var msg = reader.ReadLine();
-                ModAPI.Console.Write("$>  " + msg);
-                yield return null;
-
-                if (msg == "")
+                if (msg.Length < 2)
                 {
-                    break;
+                    return;
                 }
-                if (msg.Length == 4)
+
+                if (msg[0] =='P')
                 {
 
-                    if (msg == "PING")
+                    if (msg.StartsWith("PING"))
                     {
-                        Console.WriteLine("recieved PING");
 
                         writer.WriteLine("PONG");
                         writer.Flush();
-                        continue;
+                        return;
                     }
-                    else if (msg == "PONG")
+                    else if (msg.StartsWith("PONG"))
                     {
-                        Console.WriteLine("recieved PONG");
                         pinging = false;
                         pingDelay = Time.time;
-                        continue;
+                        return;
                     }
                 }
                 else
@@ -347,7 +367,7 @@ namespace ModAPITwitchIntegration
                         var message = split[1];
                         if (message.StartsWith(Config.prefix))
                         {
-                            yield return null;
+                            ModAPI.Console.Write("$>  " + msg);
 
                             message = message.Substring(Config.prefixLength + 1);
                             var cmd_key = Regex.Match(message, @"\w+").Value.ToLower();
@@ -362,6 +382,7 @@ namespace ModAPITwitchIntegration
                                             commands[cmd_key].action?.Invoke(message.Substring(cmd_key.Length));
                                         else
                                             commands[cmd_key].action?.Invoke("");
+                                        return;
                                     }
                                     catch (Exception e)
                                     {
@@ -370,36 +391,33 @@ namespace ModAPITwitchIntegration
                                 }
                             }
                         }
-
-
                         onmessage?.Invoke(msg);
-
-
                     }
                 }
             }
 
+        }
+        public bool UpdateJoining()
+        {
 
-
-
-            if (client.Available <= 0)
-            {
+          
                 if (!joined)
                 {
-                    yield return null;
-
                     writer.WriteLine("JOIN " + Config.channel);
                     writer.Flush();
                     joined = true;
+                    return true;
                 }
-
-
-            }
+            
+            return false;
         }
 
-
-
     }
+
+
+
+
+    
 
     public class Config
     {
